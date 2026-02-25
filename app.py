@@ -6,12 +6,11 @@ st.set_page_config(layout="wide")
 st.title("Basketball Possession Markov Model")
 
 # 1. Define States
-t1_states = ["Scorer_In_T1", "Scorer_Out_T1", "NonScorer_In_T1", "NonScorer_Out_T1"] # Early/Not Stressed
-t2_states = ["Scorer_In_T2", "Scorer_Out_T2", "NonScorer_In_T2", "NonScorer_Out_T2"] # Late/Stressed
+t1_states = ["Scorer_In_T1", "Scorer_Out_T1", "NonScorer_In_T1", "NonScorer_Out_T1"]
+t2_states = ["Scorer_In_T2", "Scorer_Out_T2", "NonScorer_In_T2", "NonScorer_Out_T2"]
 transient_states = t1_states + t2_states
 absorbing_states = ["0_pts", "1.48_pts", "2_pts", "3_pts"]
 all_states = transient_states + absorbing_states
-
 num_t, num_a = len(transient_states), len(absorbing_states)
 
 # 2. Setup Inputs
@@ -21,14 +20,33 @@ start_state = st.sidebar.selectbox("Starting State", transient_states)
 start_idx = transient_states.index(start_state)
 
 st.subheader("Transition Matrix (P)")
-st.write("Edit probabilities below. Ensure each row sums to 1.0.")
+st.write("Probabilities automatically weighted (Scorer > NonScorer, T2 > T1, Inside > Outside). Transient-to-transient probabilities are strictly equal.")
 
-# Initialize an equal-probability matrix (1/12 for all transitions)
-default_P = np.ones((num_t, len(all_states))) / len(all_states)
+# Build Logic-Based Default Matrix
+default_P = np.zeros((num_t, len(all_states)))
+
+for i, state in enumerate(transient_states):
+    is_scorer = state.startswith("Scorer")
+    is_t2 = "T2" in state
+    is_in = "In" in state
+   
+    # Calculate Absorb Probability (P_A)
+    p_a = 0.10 + (0.15 if is_scorer else 0) + (0.25 if is_t2 else 0) + (0.05 if is_in else 0)
+    p_t = 1.0 - p_a # Remaining probability for transient states
+   
+    # Distribute transient equally (Passing / Resets)
+    default_P[i, :num_t] = p_t / num_t
+   
+    # Distribute absorbing logically based on location (Turnover, FT, 2pt, 3pt)
+    if is_in:
+        default_P[i, num_t:] = [p_a * 0.40, p_a * 0.20, p_a * 0.40, 0.0]
+    else:
+        default_P[i, num_t:] = [p_a * 0.30, p_a * 0.10, p_a * 0.10, p_a * 0.50]
+
 df_P = pd.DataFrame(default_P, index=transient_states, columns=all_states)
 edited_df = st.data_editor(df_P)
 
-# Normalize probabilities just in case of slight user editing rounding errors
+# Normalize probabilities
 P = edited_df.values
 row_sums = P.sum(axis=1, keepdims=True)
 P = np.divide(P, row_sums, out=np.zeros_like(P), where=row_sums!=0)
