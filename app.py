@@ -2,7 +2,6 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-
 st.set_page_config(layout="wide")
 st.title("Basketball Possession Markov Model")
 
@@ -76,9 +75,7 @@ P = edited_df.values
 row_sums = P.sum(axis=1, keepdims=True)
 P = np.divide(P, row_sums, out=np.zeros_like(P), where=row_sums!=0)
 
-
-
-# 4. Analytical Engine
+# 3. Analytical Engine
 Q, R, I = P[:, :num_t], P[:, num_t:], np.eye(num_t)
 try:
     F = np.linalg.inv(I - Q)
@@ -89,7 +86,7 @@ try:
 except np.linalg.LinAlgError:
     st.error("Matrix is singular."); st.stop()
 
-# 5. Simulation Engine
+# 4. Simulation Engine
 def simulate(start_idx, Q, R, point_values):
     curr, ticks = start_idx, 0
     while True:
@@ -103,10 +100,16 @@ with st.spinner("Running Dual-Engine Validation..."):
     results = [simulate(start_idx, Q, R, point_values) for _ in range(trials)]
     exp_ppp, exp_dur = np.mean([r[0] for r in results]), np.mean([r[1] for r in results])
 
-# 6. Outputs
+# 5. Outputs
 col1, col2 = st.columns(2)
 col1.metric("Analytical PPP", f"{expected_ppp:.4f}")
 col2.metric("Experimental PPP", f"{exp_ppp:.4f}", delta=f"{exp_ppp - expected_ppp:.4f}")
 col3, col4 = st.columns(2)
 col3.metric("Analytical Duration (Steps)", f"{expected_dur:.2f}")
 col4.metric("Experimental Duration", f"{exp_dur:.2f}", delta=f"{exp_dur - expected_dur:.2f}")
+
+st.write("### The Fundamental Matrix (F)")
+st.dataframe(pd.DataFrame(F, index=transient_states, columns=transient_states))
+
+st.write("### Absorption Probabilities (B)")
+st.dataframe(pd.DataFrame(B, index=transient_states, columns=absorbing_states))
