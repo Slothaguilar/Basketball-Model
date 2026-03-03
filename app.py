@@ -1,7 +1,8 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import graphviz
+import networkx as nx
+import matplotlib.pyplot as plt
 
 st.set_page_config(layout="wide")
 st.title("Basketball Possession Markov Model")
@@ -77,20 +78,34 @@ row_sums = P.sum(axis=1, keepdims=True)
 P = np.divide(P, row_sums, out=np.zeros_like(P), where=row_sums!=0)
 
 # 3. Transition Diagram
+# ... (Keep Sections 1 and 2 exactly the same) ...
+
+# 3. Transition Diagram (Using NetworkX instead of Graphviz)
 st.write("### State Transition Diagram")
-dot = graphviz.Digraph(engine='dot')
-dot.attr(rankdir='LR', size='10,5')
+G = nx.DiGraph()
 
 for state in all_states:
-    shape = 'doublecircle' if state in absorbing_states else 'circle'
-    dot.node(state, state, shape=shape)
+    G.add_node(state)
 
 for i, row in enumerate(P):
     for j, prob in enumerate(row):
         if prob > 0.05: # Filter noise
-            dot.edge(transient_states[i], all_states[j], label=f"{prob:.2f}")
+            G.add_edge(transient_states[i], all_states[j], weight=prob)
 
-st.graphviz_chart(dot)
+fig, ax = plt.subplots(figsize=(12, 8))
+# Use a spring layout for positioning
+pos = nx.spring_layout(G, k=0.5, seed=42)
+
+nx.draw(G, pos, with_labels=True, node_size=3000, node_color='skyblue',
+        font_size=8, font_weight='bold', arrows=True, ax=ax)
+
+# Add edge labels (probabilities)
+edge_labels = {(u, v): f"{d['weight']:.2f}" for u, v, d in G.edges(data=True)}
+nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=7)
+
+st.pyplot(fig)
+
+# ... (Keep Sections 4, 5, and 6 exactly the same) ...
 
 # 4. Analytical Engine
 Q, R, I = P[:, :num_t], P[:, num_t:], np.eye(num_t)
