@@ -113,3 +113,33 @@ st.dataframe(pd.DataFrame(F, index=transient_states, columns=transient_states))
 
 st.write("### Absorption Probabilities (B)")
 st.dataframe(pd.DataFrame(B, index=transient_states, columns=absorbing_states))
+
+
+# 5. Aesthetically Pleasing Outputs
+st.divider()
+
+# Create tabs to organize the layout and prevent clutter
+tab1, tab2 = st.tabs(["📊 Simulation Results", "🧮 Deep Math Matrices"])
+
+with tab1:
+    st.markdown("### 🏆 Dual-Engine Validation")
+    # Using 4 columns instead of 2 rows of 2 for a cleaner top-level dashboard
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Analytical PPP", f"{expected_ppp:.4f}")
+    col2.metric("Experimental PPP", f"{exp_ppp:.4f}", delta=f"{exp_ppp - expected_ppp:.4f}")
+    col3.metric("Analytical Duration", f"{expected_dur:.2f} steps")
+    col4.metric("Exp. Duration", f"{exp_dur:.2f} steps", delta=f"{exp_dur - expected_dur:.2f}")
+
+with tab2:
+    col_f, col_b = st.columns(2)
+    with col_f:
+        st.markdown("### The Fundamental Matrix (F)")
+        # Apply a blue background gradient to visually map high/low values
+        df_F = pd.DataFrame(F, index=transient_states, columns=transient_states)
+        st.dataframe(df_F.style.background_gradient(cmap='Blues'), use_container_width=True)
+       
+    with col_b:
+        st.markdown("### Absorption Probabilities (B)")
+        # Apply a green background gradient
+        df_B = pd.DataFrame(B, index=transient_states, columns=absorbing_states)
+        st.dataframe(df_B.style.background_gradient(cmap='Greens'), use_container_width=True)
