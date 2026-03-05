@@ -118,15 +118,4 @@ st.dataframe(pd.DataFrame(B, index=transient_states, columns=absorbing_states))
 
 
 # diagram 
-st.write("### State Transition Matrix (Heatmap)")
 
-# Create a Pandas DataFrame for your P matrix
-df_transitions = pd.DataFrame(P, index=transient_states, columns=all_states)
-
-# Apply a background color gradient to simulate a heatmap and format numbers
-styled_df = df_transitions.style.background_gradient(
-    cmap='Blues', axis=None
-).format("{:.2f}")
-
-# Display natively in Streamlit
-st.dataframe(styled_df, use_container_width=True)
