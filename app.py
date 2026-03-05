@@ -148,31 +148,3 @@ with tab2:
 
 
 
-# --- NAVIGATION MENU ---
-st.sidebar.title("🧭 Navigation")
-page = st.sidebar.radio("Go to:", [
-    "⚙️ Matrix Setup",
-    "📊 Simulation Results",
-    "🧮 Deep Math Matrices",
-    "⛹️ Play-by-Play"
-])
-
-st.sidebar.divider() # Adds a clean visual break before your parameters
-
-# --- RENDER PAGES BASED ON SELECTION ---
-if page == "⚙️ Matrix Setup":
-    st.subheader("Interactive Transition Matrix (P)")
-    # (Insert matrix setup UI here)
-
-elif page == "📊 Simulation Results":
-    st.markdown("### 🏆 Dual-Engine Validation")
-    # (Insert simulation metrics here)
-
-elif page == "🧮 Deep Math Matrices":
-    st.markdown("### The Fundamental Matrix (F)")
-    # (Insert custom CSS and F/B dataframes here)
-
-elif page == "⛹️ Play-by-Play":
-    st.subheader("Live Play-by-Play Visualizer")
-    # (Insert play-by-play simulator here)
-
