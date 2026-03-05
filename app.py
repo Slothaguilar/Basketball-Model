@@ -2,8 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-import networkx as nx
-import matplotlib.pyplot as plt
+import plotly.express as px
 
 st.set_page_config(layout="wide")
 st.title("Basketball Possession Markov Model")
@@ -119,33 +118,16 @@ st.dataframe(pd.DataFrame(B, index=transient_states, columns=absorbing_states))
 
 
 # diagram 
-st.write("### State Transition Diagram")
+st.write("### State Transition Heatmap")
 
-# Create directed graph
-G = nx.DiGraph()
+# Visualizes the P matrix directly
+fig = px.imshow(
+    P,
+    labels=dict(x="To State", y="From State", color="Probability"),
+    x=all_states,
+    y=transient_states,
+    color_continuous_scale="Blues",
+    text_auto=".2f" # Shows the probabilities as text in the squares
+)
 
-# Add all states as nodes
-for state in all_states:
-    G.add_node(state)
-
-# Add edges, filtering out very low probabilities (< 5%) to keep the diagram readable
-for i, row in enumerate(P):
-    for j, prob in enumerate(row):
-        if prob > 0.05:
-            G.add_edge(transient_states[i], all_states[j], weight=round(prob, 2))
-
-# Setup plot
-fig, ax = plt.subplots(figsize=(14, 10))
-pos = nx.spring_layout(G, k=0.8, seed=42) # k adjusts node spacing
-
-# Draw the graph
-nx.draw(G, pos, with_labels=True, node_size=3000, node_color='lightblue',
-        font_size=9, font_weight='bold', arrows=True, arrowsize=15, ax=ax)
-
-# Draw the probability weights on edges
-edge_labels = {(u, v): f"{d['weight']}" for u, v, d in G.edges(data=True)}
-nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8)
-
-# Render in Streamlit
-st.pyplot(fig)
-
+st.plotly_chart(fig)
