@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
-import plotly.express as px
+#import plotly.express as px
 
 st.set_page_config(layout="wide")
 st.title("Basketball Possession Markov Model")
@@ -118,16 +118,15 @@ st.dataframe(pd.DataFrame(B, index=transient_states, columns=absorbing_states))
 
 
 # diagram 
-st.write("### State Transition Heatmap")
+st.write("### State Transition Matrix (Heatmap)")
 
-# Visualizes the P matrix directly
-fig = px.imshow(
-    P,
-    labels=dict(x="To State", y="From State", color="Probability"),
-    x=all_states,
-    y=transient_states,
-    color_continuous_scale="Blues",
-    text_auto=".2f" # Shows the probabilities as text in the squares
-)
+# Create a Pandas DataFrame for your P matrix
+df_transitions = pd.DataFrame(P, index=transient_states, columns=all_states)
 
-st.plotly_chart(fig)
+# Apply a background color gradient to simulate a heatmap and format numbers
+styled_df = df_transitions.style.background_gradient(
+    cmap='Blues', axis=None
+).format("{:.2f}")
+
+# Display natively in Streamlit
+st.dataframe(styled_df, use_container_width=True)
