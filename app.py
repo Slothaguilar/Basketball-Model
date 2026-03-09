@@ -87,26 +87,42 @@ except np.linalg.LinAlgError:
     st.error("Matrix is singular."); st.stop()
 
 # 4. Simulation Engine
-def simulate(start_idx, Q, R, point_values):
-    curr, ticks = start_idx, 0
+# 1. Define the time cost (in seconds) for each transient state
+# T1 states take 17s, T2 states take 17s, OREB takes ~2s to resolve
+time_costs = np.array([17 if "_T1" in s else 17 if "_T2" in s else 2 for s in transient_states])
+
+# 2. Update Analytical Engine
+# Expected seconds is the dot product of the Fundamental Matrix row and the time costs
+expected_seconds = np.dot(F, time_costs)[start_idx]
+
+# 3. Update Simulation Engine to track seconds instead of ticks
+def simulate_seconds(start_idx, Q, R, point_values, time_costs):
+    curr = start_idx
+    total_seconds = 0
     while True:
-        ticks += 1
+        total_seconds += time_costs[curr] # Add the specific state's time cost
         probs = np.concatenate((Q[curr], R[curr]))
         nxt = np.random.choice(len(all_states), p=probs)
-        if nxt >= num_t: return point_values[nxt - num_t], ticks
+        if nxt >= num_t:
+            return point_values[nxt - num_t], total_seconds
         curr = nxt
 
-with st.spinner("Running Dual-Engine Validation..."):
-    results = [simulate(start_idx, Q, R, point_values) for _ in range(trials)]
-    exp_ppp, exp_dur = np.mean([r[0] for r in results]), np.mean([r[1] for r in results])
+with st.spinner("Running Time-Based Simulation..."):
+    results = [simulate_seconds(start_idx, Q, R, point_values, time_costs) for _ in range(trials)]
+    exp_ppp = np.mean([r[0] for r in results])
+    exp_seconds = np.mean([r[1] for r in results])
+
+# 4. Update the UI Metrics
+col3, col4 = st.columns(2)
+col3.metric("Analytical Duration", f"{expected_seconds:.1f} seconds")
+col4.metric("Simulated Duration", f"{exp_seconds:.1f} seconds", delta=f"{exp_seconds - expected_seconds:.1f}")
 
 # 5. Outputs
 col1, col2 = st.columns(2)
 col1.metric("Analytical PPP", f"{expected_ppp:.4f}")
 col2.metric("Experimental PPP", f"{exp_ppp:.4f}", delta=f"{exp_ppp - expected_ppp:.4f}")
 col3, col4 = st.columns(2)
-col3.metric("Analytical Duration (Steps)", f"{expected_dur:.2f}")
-col4.metric("Experimental Duration", f"{exp_dur:.2f}", delta=f"{exp_dur - expected_dur:.2f}")
+
 
 st.write("### The Fundamental Matrix (F)")
 st.dataframe(pd.DataFrame(F, index=transient_states, columns=transient_states))
