@@ -9,7 +9,7 @@ st.title("Basketball Possession Markov Model")
 t1_states = ["Scorer_In_T1", "Scorer_Out_T1", "NonScorer_In_T1", "NonScorer_Out_T1"]
 t2_states = ["Scorer_In_T2", "Scorer_Out_T2", "NonScorer_In_T2", "NonScorer_Out_T2"]
 transient_states = t1_states + t2_states + ["OREB_State"]
-absorbing_states = ["0_pts", "1.3_pts", "2_pts", "2.75_pts", "3_pts", "3.75_pts"]
+absorbing_states = ["0_pts", "1.8_pts", "2_pts", "2.75_pts", "3_pts", "3.75_pts"]
 all_states = transient_states + absorbing_states
 num_t, num_a = len(transient_states), len(absorbing_states)
 
