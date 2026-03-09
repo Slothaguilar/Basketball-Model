@@ -87,20 +87,19 @@ except np.linalg.LinAlgError:
     st.error("Matrix is singular."); st.stop()
 
 # 4. Simulation Engine
-# 1. Define the time cost (in seconds) for each transient state
-# T1 states take 17s, T2 states take 17s, OREB takes ~2s to resolve
-time_costs = np.array([17 if "_T1" in s else 17 if "_T2" in s else 2 for s in transient_states])
+# 1. Realistic Time Costs (in seconds)
+# Each discrete step/pass takes ~3 seconds. An OREB takes ~2 seconds to resolve.
+time_costs = np.array([3 if "T1" in s else 3 if "T2" in s else 2 for s in transient_states])
 
-# 2. Update Analytical Engine
-# Expected seconds is the dot product of the Fundamental Matrix row and the time costs
+# 2. Analytical Expected Seconds
 expected_seconds = np.dot(F, time_costs)[start_idx]
 
-# 3. Update Simulation Engine to track seconds instead of ticks
+# 3. Simulation Engine Updates
 def simulate_seconds(start_idx, Q, R, point_values, time_costs):
     curr = start_idx
     total_seconds = 0
     while True:
-        total_seconds += time_costs[curr] # Add the specific state's time cost
+        total_seconds += time_costs[curr] # Add 3s for a pass, or 2s for OREB
         probs = np.concatenate((Q[curr], R[curr]))
         nxt = np.random.choice(len(all_states), p=probs)
         if nxt >= num_t:
@@ -112,10 +111,7 @@ with st.spinner("Running Time-Based Simulation..."):
     exp_ppp = np.mean([r[0] for r in results])
     exp_seconds = np.mean([r[1] for r in results])
 
-# 4. Update the UI Metrics
-col3, col4 = st.columns(2)
-col3.metric("Analytical Duration", f"{expected_seconds:.1f} seconds")
-col4.metric("Simulated Duration", f"{exp_seconds:.1f} seconds", delta=f"{exp_seconds - expected_seconds:.1f}")
+
 
 # 5. Outputs
 col1, col2 = st.columns(2)
