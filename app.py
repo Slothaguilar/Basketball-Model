@@ -19,7 +19,6 @@ trials = st.sidebar.number_input("Monte Carlo Trials", 100, 50000, 10000)
 start_state = st.sidebar.selectbox("Starting State", transient_states)
 start_idx = transient_states.index(start_state)
 base_oreb_rate = st.sidebar.slider("Base OREB %", 0.0, 1.0, 0.38, 0.01)
-transition_time = st.sidebar.slider("Half-Court Transition Time (s)", 0.0, 10.0, 5.0, 0.5)
 
 st.subheader("Transition Matrix (P)")
 default_P = np.zeros((num_t, len(all_states)))
@@ -31,6 +30,7 @@ for i, state in enumerate(transient_states[:-1]):
    
     p_a = 0.15 + (0.15 if is_scorer else 0) + (0.25 if is_t2 else 0) + (0.05 if is_in else 0)
     p_t = 1.0 - p_a
+   
     default_P[i, :8] = p_t / 8
    
     turnover_weight = 0.15 + (0.20 if not is_scorer else 0) + (0.15 if is_t2 else 0)
@@ -42,6 +42,7 @@ for i, state in enumerate(transient_states[:-1]):
     total_make = clean_shot * (0.50 if is_in else 0.30)
     total_miss = clean_shot * (0.50 if is_in else 0.70)
    
+    # Apply the dynamic OREB slider
     oreb_prob = total_miss * base_oreb_rate
     dreb_prob = total_miss * (1 - base_oreb_rate)
    
@@ -78,19 +79,18 @@ Q, R, I = P[:, :num_t], P[:, num_t:], np.eye(num_t)
 try:
     F = np.linalg.inv(I - Q)
     B = np.dot(F, R)
-    point_values = np.array([0, 1.8, 2, 2.75, 3, 3.75])
+    point_values = np.array([0, 1.3, 2, 2.75, 3, 3.75])
     expected_ppp = np.dot(B, point_values)[start_idx]
 except np.linalg.LinAlgError:
     st.error("Matrix is singular."); st.stop()
 
 # 4. Realistic Time Costs & Simulation Engine
 time_costs = np.array([3 if 'T1' in s else 3 if 'T2' in s else 2 for s in transient_states])
-# Add transition time to the total expected duration
-expected_seconds = np.dot(F, time_costs)[start_idx] + transition_time
+expected_seconds = np.dot(F, time_costs)[start_idx]
 
 def simulate_seconds(start_idx, Q, R, point_values, time_costs):
     curr = start_idx
-    total_seconds = transition_time # Start with transition time
+    total_seconds = 0
     while True:
         total_seconds += time_costs[curr]
         probs = np.concatenate((Q[curr], R[curr]))
@@ -102,4 +102,33 @@ def simulate_seconds(start_idx, Q, R, point_values, time_costs):
 with st.spinner("Running Time-Based Simulation..."):
     results = [simulate_seconds(start_idx, Q, R, point_values, time_costs) for _ in range(trials)]
     exp_ppp = np.mean([r[0] for r in results])
-    exp_seconds = np
+    exp_seconds = np.mean([r[1] for r in results])
+
+# 5. Dependency-Free Aesthetically Pleasing Outputs
+st.divider()
+
+st.markdown("""
+<style>
+    div[data-testid="stMetricValue"] { color: #ff4b4b; font-weight: bold; }
+    h3 { border-bottom: 2px solid #ff4b4b; padding-bottom: 5px; }
+</style>
+""", unsafe_allow_html=True)
+
+tab1, tab2 = st.tabs(["📊 Simulation Results", "🧮 Deep Math Matrices"])
+
+with tab1:
+    st.markdown("### 🏆 Dual-Engine Validation")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Analytical PPP", f"{expected_ppp:.4f}")
+    col2.metric("Simulated PPP", f"{exp_ppp:.4f}", delta=f"{exp_ppp - expected_ppp:.4f}")
+    col3.metric("Analytical Duration", f"{expected_seconds:.1f} sec")
+    col4.metric("Simulated Duration", f"{exp_seconds:.1f} sec", delta=f"{exp_seconds - expected_seconds:.1f}")
+
+with tab2:
+    st.markdown("### The Fundamental Matrix (F)")
+    df_F = pd.DataFrame(F, index=transient_states, columns=transient_states)
+    st.dataframe(df_F, use_container_width=True)
+       
+    st.markdown("### Absorption Probabilities (B)")
+    df_B = pd.DataFrame(B, index=transient_states, columns=absorbing_states)
+    st.bar_chart(df_B)
