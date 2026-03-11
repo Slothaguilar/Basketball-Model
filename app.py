@@ -6,10 +6,10 @@ st.set_page_config(layout="wide")
 st.title("Basketball Possession Markov Model")
 
 # 1. Define States
-t1_states = ["Scorer_In_T1", "Scorer_Out_T1", "NonScorer_In_T1", "NonScorer_Out_T1"]
-t2_states = ["Scorer_In_T2", "Scorer_Out_T2", "NonScorer_In_T2", "NonScorer_Out_T2"]
-transient_states = t1_states + t2_states + ["OREB_State"]
-absorbing_states = ["0_pts", "1.8_pts", "2_pts", "2.75_pts", "3_pts", "3.75_pts"]
+t1_states = ['Scorer_In_T1', 'Scorer_Out_T1', 'NonScorer_In_T1', 'NonScorer_Out_T1']
+t2_states = ['Scorer_In_T2', 'Scorer_Out_T2', 'NonScorer_In_T2', 'NonScorer_Out_T2']
+transient_states = t1_states + t2_states + ['OREB_State']
+absorbing_states = ['0_pts', '1.8_pts', '2_pts', '2.75_pts', '3_pts', '3.75_pts']
 all_states = transient_states + absorbing_states
 num_t, num_a = len(transient_states), len(absorbing_states)
 
@@ -18,19 +18,19 @@ st.sidebar.header("Simulation Parameters")
 trials = st.sidebar.number_input("Monte Carlo Trials", 100, 50000, 10000)
 start_state = st.sidebar.selectbox("Starting State", transient_states)
 start_idx = transient_states.index(start_state)
+base_oreb_rate = st.sidebar.slider("Base OREB %", 0.0, 1.0, 0.38, 0.01)
 
 st.subheader("Transition Matrix (P)")
 default_P = np.zeros((num_t, len(all_states)))
 
-for i, state in enumerate(transient_states[:-1]): # Iterate T1 and T2
-    is_scorer = state.startswith("Scorer")
-    is_t2 = "T2" in state
-    is_in = "In" in state
+for i, state in enumerate(transient_states[:-1]):
+    is_scorer = state.startswith('Scorer')
+    is_t2 = 'T2' in state
+    is_in = 'In' in state
    
     p_a = 0.15 + (0.15 if is_scorer else 0) + (0.25 if is_t2 else 0) + (0.05 if is_in else 0)
     p_t = 1.0 - p_a
    
-    # Standard passing to T1/T2
     default_P[i, :8] = p_t / 8
    
     turnover_weight = 0.15 + (0.20 if not is_scorer else 0) + (0.15 if is_t2 else 0)
@@ -42,17 +42,16 @@ for i, state in enumerate(transient_states[:-1]): # Iterate T1 and T2
     total_make = clean_shot * (0.50 if is_in else 0.30)
     total_miss = clean_shot * (0.50 if is_in else 0.70)
    
-    oreb_prob = total_miss * 0.38
-    dreb_prob = total_miss * 0.62
+    # Apply the dynamic OREB slider
+    oreb_prob = total_miss * base_oreb_rate
+    dreb_prob = total_miss * (1 - base_oreb_rate)
    
-    # Send OREB to the new OREB_State
     default_P[i, 8] = oreb_prob
        
     and1_rate = 0.10 if is_t2 else 0.05
     and1_make = total_make * and1_rate
     clean_make = total_make * (1 - and1_rate)
    
-    # Absorbing
     default_P[i, num_t] = turnover_prob + dreb_prob
     default_P[i, num_t + 1] = ft_prob
     if is_in:
@@ -60,13 +59,13 @@ for i, state in enumerate(transient_states[:-1]): # Iterate T1 and T2
     else:
         default_P[i, num_t + 4], default_P[i, num_t + 5] = clean_make, and1_make
 
-# OREB_State Logic (High paint efficiency & fouls)
-default_P[8, :4] = 0.20 / 4  # Pass back out to T1
-default_P[8, 8] = 0.05       # Tipped another OREB
-default_P[8, num_t] = 0.15   # Miss/TOV (0_pts)
-default_P[8, num_t + 1] = 0.15 # Shooting Foul (1.3_pts)
-default_P[8, num_t + 2] = 0.35 # Putback Make (2_pts)
-default_P[8, num_t + 3] = 0.10 # Putback And-1 (2.75_pts)
+# OREB_State Logic
+default_P[8, :4] = 0.20 / 4
+default_P[8, 8] = 0.05      
+default_P[8, num_t] = 0.15  
+default_P[8, num_t + 1] = 0.15
+default_P[8, num_t + 2] = 0.35
+default_P[8, num_t + 3] = 0.10
 
 df_P = pd.DataFrame(default_P, index=transient_states, columns=all_states)
 edited_df = st.data_editor(df_P)
@@ -82,25 +81,18 @@ try:
     B = np.dot(F, R)
     point_values = np.array([0, 1.3, 2, 2.75, 3, 3.75])
     expected_ppp = np.dot(B, point_values)[start_idx]
-    expected_dur = np.sum(F, axis=1)[start_idx]
 except np.linalg.LinAlgError:
     st.error("Matrix is singular."); st.stop()
 
-# 4. Simulation Engine
-# 1. Define the time cost (in seconds) for each transient state
-# T1 states take 17s, T2 states take 17s, OREB takes ~2s to resolve
-time_costs = np.array([17 if "_T1" in s else 17 if "_T2" in s else 2 for s in transient_states])
-
-# 2. Update Analytical Engine
-# Expected seconds is the dot product of the Fundamental Matrix row and the time costs
+# 4. Realistic Time Costs & Simulation Engine
+time_costs = np.array([3 if 'T1' in s else 3 if 'T2' in s else 2 for s in transient_states])
 expected_seconds = np.dot(F, time_costs)[start_idx]
 
-# 3. Update Simulation Engine to track seconds instead of ticks
 def simulate_seconds(start_idx, Q, R, point_values, time_costs):
     curr = start_idx
     total_seconds = 0
     while True:
-        total_seconds += time_costs[curr] # Add the specific state's time cost
+        total_seconds += time_costs[curr]
         probs = np.concatenate((Q[curr], R[curr]))
         nxt = np.random.choice(len(all_states), p=probs)
         if nxt >= num_t:
@@ -111,57 +103,10 @@ with st.spinner("Running Time-Based Simulation..."):
     results = [simulate_seconds(start_idx, Q, R, point_values, time_costs) for _ in range(trials)]
     exp_ppp = np.mean([r[0] for r in results])
     exp_seconds = np.mean([r[1] for r in results])
-
-# 4. Update the UI Metrics
-col3, col4 = st.columns(2)
-col3.metric("Analytical Duration", f"{expected_seconds:.1f} seconds")
-col4.metric("Simulated Duration", f"{exp_seconds:.1f} seconds", delta=f"{exp_seconds - expected_seconds:.1f}")
-
-# 1. Realistic Time Costs (in seconds)
-# Each discrete step/pass takes ~3 seconds. An OREB takes ~2 seconds to resolve.
-time_costs = np.array([3 if "T1" in s else 3 if "T2" in s else 2 for s in transient_states])
-
-# 2. Analytical Expected Seconds
-expected_seconds = np.dot(F, time_costs)[start_idx]
-
-# 3. Simulation Engine Updates
-def simulate_seconds(start_idx, Q, R, point_values, time_costs):
-    curr = start_idx
-    total_seconds = 0
-    while True:
-        total_seconds += time_costs[curr] # Add 3s for a pass, or 2s for OREB
-        probs = np.concatenate((Q[curr], R[curr]))
-        nxt = np.random.choice(len(all_states), p=probs)
-        if nxt >= num_t:
-            return point_values[nxt - num_t], total_seconds
-        curr = nxt
-
-with st.spinner("Running Time-Based Simulation..."):
-    results = [simulate_seconds(start_idx, Q, R, point_values, time_costs) for _ in range(trials)]
-    exp_ppp = np.mean([r[0] for r in results])
-    exp_seconds = np.mean([r[1] for r in results])
-
-
-
-# 5. Outputs
-col1, col2 = st.columns(2)
-col1.metric("Analytical PPP", f"{expected_ppp:.4f}")
-col2.metric("Experimental PPP", f"{exp_ppp:.4f}", delta=f"{exp_ppp - expected_ppp:.4f}")
-col3, col4 = st.columns(2)
-
-
-st.write("### The Fundamental Matrix (F)")
-st.dataframe(pd.DataFrame(F, index=transient_states, columns=transient_states))
-
-st.write("### Absorption Probabilities (B)")
-st.dataframe(pd.DataFrame(B, index=transient_states, columns=absorbing_states))
-
-
 
 # 5. Dependency-Free Aesthetically Pleasing Outputs
 st.divider()
 
-# Inject custom CSS to style metrics and headers
 st.markdown("""
 <style>
     div[data-testid="stMetricValue"] { color: #ff4b4b; font-weight: bold; }
@@ -176,17 +121,14 @@ with tab1:
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Analytical PPP", f"{expected_ppp:.4f}")
     col2.metric("Simulated PPP", f"{exp_ppp:.4f}", delta=f"{exp_ppp - expected_ppp:.4f}")
-    col3.metric("Analytical Duration", f"{expected_dur:.2f} steps")
-    col4.metric("Simulated Duration", f"{exp_dur:.2f} steps", delta=f"{exp_dur - expected_dur:.2f}")
+    col3.metric("Analytical Duration", f"{expected_seconds:.1f} sec")
+    col4.metric("Simulated Duration", f"{exp_seconds:.1f} sec", delta=f"{exp_seconds - expected_seconds:.1f}")
 
 with tab2:
     st.markdown("### The Fundamental Matrix (F)")
     df_F = pd.DataFrame(F, index=transient_states, columns=transient_states)
-    st.dataframe(df_F, use_container_width=True) # Standard dataframe
+    st.dataframe(df_F, use_container_width=True)
        
     st.markdown("### Absorption Probabilities (B)")
     df_B = pd.DataFrame(B, index=transient_states, columns=absorbing_states)
-    st.bar_chart(df_B) # Native interactive bar chart (no imports needed!) 
-
-
-
+    st.bar_chart(df_B)
